@@ -433,6 +433,7 @@ void main() async {
   );
   testAnnotatedElements<Mapper>(ficReader, generator);
 
+  // Keep the prefixed collection fixture last to avoid a test resolver error.
   // Group: collections of fast_immutable_collections imported with a prefix
   final ficAliasReader = await initializeLibraryReaderForDirectory(
     'test/golden/src',
