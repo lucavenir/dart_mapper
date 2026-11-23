@@ -175,7 +175,7 @@ abstract class FmTypedNullableMapper {
 
 @ShouldThrow(
   "Ambiguous mapping for type 'DateTime': multiple methods are candidates (fmAmbiguousConverters.fromMillis, fmAmbiguousConverters.fromIso).\n"
-  "Fix: Keep a single candidate per type, or select the one to use with @Mapping(target: '...', callable: yourFunction).",
+  "Fix: Keep a single candidate per type, or select the one to use with @Mapping(target: '...', qualifiedBy: 'methodName') or @Mapping(target: '...', callable: yourFunction).",
 )
 @Mapper(uses: {FmAmbiguousConverters})
 abstract class FmAmbiguousConverterMapper {
@@ -184,8 +184,7 @@ abstract class FmAmbiguousConverterMapper {
 
 @ShouldThrow(
   "Cannot map a Map to 'FmShape': the class is sealed and cannot be instantiated.\n"
-  "Mapping to sealed classes or to classes selected by a discriminator key is not supported yet (tracked in issue #119).\n"
-  "Fix: Map to a concrete class.",
+  "Fix: Map to a concrete class, or select the subclass with a discriminator key by annotating the method with @DiscriminatorKey('key') and one @SubclassMapping(target: Subclass, discriminatorValue: ...) per subclass.",
 )
 @Mapper()
 abstract class FmSealedTargetMapper {
@@ -194,8 +193,7 @@ abstract class FmSealedTargetMapper {
 
 @ShouldThrow(
   "Cannot map a Map to 'FmAbstractThing': the class is abstract and cannot be instantiated.\n"
-  "Mapping to sealed classes or to classes selected by a discriminator key is not supported yet (tracked in issue #119).\n"
-  "Fix: Map to a concrete class.",
+  "Fix: Map to a concrete class, or select the subclass with a discriminator key by annotating the method with @DiscriminatorKey('key') and one @SubclassMapping(target: Subclass, discriminatorValue: ...) per subclass.",
 )
 @Mapper()
 abstract class FmAbstractTargetMapper {

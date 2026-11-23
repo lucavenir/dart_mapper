@@ -15,9 +15,10 @@ MapStruct-style object mapping for Dart. Define type-safe mappings declaratively
 - Dot notation for nested property access
 - Expression-based computed fields
 - Conditional mapping with fallback values
-- Subclass mapping with Dart 3 pattern matching
+- Subclass mapping with Dart 3 pattern matching, including `Map` ↔ sealed class hierarchies via a discriminator
 - Default values and constants
 - Callable functions for custom mapping logic
+- Comma-separated sources resolved through mapper methods, `qualifiedBy`, method parameters as sources
 - Class ↔ `Map<String, dynamic>` mapping (Firestore, Realtime Database, JSON-like payloads)
 - Collection support (`List`, `Set`, `Map`, `BuiltList`, `BuiltSet`, `BuiltMap`)
 - [fast_immutable_collections](https://pub.dev/packages/fast_immutable_collections) support (`IList`, `ISet`, `IMap`, `IMapOfSets`, `ListSet`, `ListMap`)
@@ -28,11 +29,11 @@ MapStruct-style object mapping for Dart. Define type-safe mappings declaratively
 
 ```yaml
 dependencies:
-  dart_mapper: ^1.0.0
+  dart_mapper: ^1.1.0
 
 dev_dependencies:
   build_runner: ^2.4.8
-  dart_mapper_generator: ^1.0.0
+  dart_mapper_generator: ^1.1.0
 ```
 
 ## Documentation

@@ -23,6 +23,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:dart_mapper/dart_mapper.dart';
@@ -53,7 +54,12 @@ extension MappingAnnotation on Mapping {
           .where(
             (annotation) => inverse
                 ? annotation.getField('source')?.toStringValue() != null &&
-                    annotation.getField('target')?.toStringValue() != null
+                    annotation.getField('target')?.toStringValue() != null &&
+                    // A comma-separated mapping cannot be inverted.
+                    !annotation
+                        .getField('source')!
+                        .toStringValue()!
+                        .contains(',')
                 : true,
           )
           .map(
@@ -72,7 +78,12 @@ extension MappingAnnotation on Mapping {
                   annotation.getField('defaultValue')?.toStringValue(),
               constant: annotation.getField('constant')?.toStringValue(),
               expression: annotation.getField('expression')?.toStringValue(),
-              conditionExpression: annotation.getField('conditionExpression')?.toStringValue(),
+              conditionExpression:
+                  annotation.getField('conditionExpression')?.toStringValue(),
+              // The method that converts one way does not convert the other way.
+              qualifiedBy: inverse
+                  ? null
+                  : annotation.getField('qualifiedBy')?.toStringValue(),
             ),
           );
 }
@@ -105,16 +116,44 @@ extension InheritInverseConfigurationAnnotation on InheritInverseConfiguration {
   }
 }
 
+/// A @SubclassMapping as written in the source: the sides left out are null.
+typedef ResolvedSubclassMapping = ({
+  DartType? sourceType,
+  DartType? targetType,
+  DartObject? discriminatorValue,
+});
+
 extension SubclassMappingAnnotation on SubclassMapping {
-  /// Returns all @SubclassMapping annotations on [method] as
-  /// (sourceType, targetType) pairs. Returns empty iterable if none present.
-  static Iterable<({DartType sourceType, DartType targetType})> loadAll(
-    MethodElement method,
-  ) =>
+  /// Returns all @SubclassMapping annotations on [method]. Returns empty
+  /// iterable if none present.
+  static Iterable<ResolvedSubclassMapping> loadAll(MethodElement method) =>
       TypeChecker.typeNamed(SubclassMapping)
           .annotationsOf(method)
           .map((annotation) => (
-                sourceType: annotation.getField('source')!.toTypeValue()!,
-                targetType: annotation.getField('target')!.toTypeValue()!,
+                sourceType: annotation.getField('source')?.toTypeValue(),
+                targetType: annotation.getField('target')?.toTypeValue(),
+                discriminatorValue: annotation
+                    .getField('discriminatorValue')
+                    .nonNullObject,
               ));
+}
+
+extension on DartObject? {
+  /// This object, or null when absent or the `null` constant.
+  DartObject? get nonNullObject {
+    final object = this;
+    return object == null || object.isNull ? null : object;
+  }
+}
+
+extension DiscriminatorKeyAnnotation on DiscriminatorKey {
+  /// The key of the first @DiscriminatorKey on [element], or null when it is
+  /// not annotated.
+  static String? loadFirst(Element element) => TypeChecker.typeNamed(
+        DiscriminatorKey,
+      ).firstAnnotationOf(element)?.getField('key')?.toStringValue();
+
+  /// Whether [element] is annotated with @DiscriminatorKey.
+  static bool isPresent(Element element) =>
+      TypeChecker.typeNamed(DiscriminatorKey).hasAnnotationOf(element);
 }
