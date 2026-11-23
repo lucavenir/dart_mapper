@@ -35,6 +35,51 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart'
     as fic;
 import 'package:source_gen_test/annotations.dart';
 
+class FicElementMapper {
+  String? convert(int? value) => value?.toString();
+
+  static String? staticConvert(int? value) => value?.toString();
+}
+
+@ShouldGenerate(
+  r'''fic.IList<String?>? toIList(fic.ISet<int?>? values) {
+    if (values == null) return null;
+    return fic.IList<String?>(
+      values.map<String?>(this.ficElementMapper.convert),
+    );
+  }''',
+  contains: true,
+)
+@ShouldGenerate(
+  r'''fic.ISet<String?> toISet(fic.ListSet<int?> values) {
+    return fic.ISet<String?>(
+      values.map<String?>(this.ficElementMapper.convert),
+    );
+  }''',
+  contains: true,
+)
+@ShouldGenerate(
+  r'''return fic.ListSet<String?>.of(
+      values.map<String?>(this.ficElementMapper.convert),
+    );''',
+  contains: true,
+)
+@ShouldGenerate(
+  r'''List<String?> toList(fic.IList<int?> values) {
+    return values
+        .map<String?>(this.ficElementMapper.convert)
+        .toList(growable: true);
+  }''',
+  contains: true,
+)
+@Mapper(uses: {FicElementMapper})
+abstract class FicCollectionMapper {
+  fic.IList<String?>? toIList(fic.ISet<int?>? values);
+  fic.ISet<String?> toISet(fic.ListSet<int?> values);
+  fic.ListSet<String?> toListSet(List<int?> values);
+  List<String?> toList(fic.IList<int?> values);
+}
+
 class FicAliasSource {
   final List<String> items;
   final List<String> queue;

@@ -27,6 +27,7 @@ import 'package:dart_mapper_generator/src/analyzers/analyzer.dart';
 import 'package:dart_mapper_generator/src/analyzers/contexts/analyzer_context.dart';
 import 'package:dart_mapper_generator/src/analyzers/contexts/bindings_analyzer_context.dart';
 import 'package:dart_mapper_generator/src/analyzers/contexts/method_analyzer_context.dart';
+import 'package:dart_mapper_generator/src/analyzers/mapping_method/method_signature_lookup.dart';
 import 'package:dart_mapper_generator/src/analyzers/subclass_mapping_analyzer.dart';
 import 'package:dart_mapper_generator/src/extensions/dart_type.dart';
 import 'package:dart_mapper_generator/src/extensions/element.dart';
@@ -39,6 +40,7 @@ import 'package:dart_mapper_generator/src/models/mapper/mapper_class.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapper_instance_field.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/mapping_parameter.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/bases/mapping_method.dart';
+import 'package:dart_mapper_generator/src/models/mapper/mapping/method/collection_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/defined_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapper_usage.dart';
 import 'package:dart_mapper_generator/src/models/mapping_behavior.dart';
@@ -86,7 +88,7 @@ class BindingsAnalyzer extends Analyzer<Bindings> {
           return accumulator;
         }
 
-        final inheritContext = MethodAnalyzerContext(
+        final methodContext = MethodAnalyzerContext(
           mapperAnnotation: context.mapperAnnotation,
           mapperUsages: mapperUsages,
           internalMapperUsages: internalMapperUsages,
@@ -95,41 +97,65 @@ class BindingsAnalyzer extends Analyzer<Bindings> {
           method: method,
         );
 
-        final inheritedRenamingMap =
-            inheritConfigurationAnalyzer.analyze(inheritContext);
-        final inheritedRenamingMapReversed =
-            inverseInheritConfigurationAnalyzer.analyze(inheritContext);
+        final name = method.name;
+        final source = method.formalParameters.singleOrNull;
+        final target = method.returnType;
+        if (name != null &&
+            source != null &&
+            source.name != null &&
+            source.type.isIterable &&
+            target.isIterable) {
+          final targetItemType = target.asGenerics!.single;
+          final elementMapper = MethodSignatureLookup(methodContext).find(
+            target: name,
+            arguments: [
+              SourceArgument(
+                type: source.type.asGenerics!.single,
+                description: '${source.name} element',
+              ),
+            ],
+            targetType: targetItemType,
+            forCollectionElements: true,
+          );
+          accumulator.add(
+            CollectionMappingMethod(
+              name: name,
+              targetType: target,
+              targetItemType: targetItemType,
+              source: source,
+              typeParameters: method.typeParameters,
+              elementMapper: elementMapper,
+            ),
+          );
+          return accumulator;
+        }
 
-        final mappingBehavior = mappingBehaviorAnalyzer.analyze(
-          MethodAnalyzerContext(
-            mapperAnnotation: context.mapperAnnotation,
-            mapperClass: context.mapperClass,
-            importAliases: context.importAliases,
-            mapperUsages: mapperUsages,
-            internalMapperUsages: internalMapperUsages,
-            method: method,
-          ),
-        );
+        final inheritedRenamingMap =
+            inheritConfigurationAnalyzer.analyze(methodContext);
+        final inheritedRenamingMapReversed =
+            inverseInheritConfigurationAnalyzer.analyze(methodContext);
+
+        final mappingBehavior = mappingBehaviorAnalyzer.analyze(methodContext);
 
         final bindingsContext = BindingsAnalyzerContext(
-              mapperAnnotation: context.mapperAnnotation,
-              mapperClass: context.mapperClass,
-              importAliases: context.importAliases,
-              mapperUsages: mapperUsages,
-              internalMapperUsages: internalMapperUsages,
-              inheritedRenaming: inheritedRenamingMap,
-              inheritedRenamingReversed: inheritedRenamingMapReversed,
-              method: method,
-            );
+          mapperAnnotation: context.mapperAnnotation,
+          mapperClass: context.mapperClass,
+          importAliases: context.importAliases,
+          mapperUsages: mapperUsages,
+          internalMapperUsages: internalMapperUsages,
+          inheritedRenaming: inheritedRenamingMap,
+          inheritedRenamingReversed: inheritedRenamingMapReversed,
+          method: method,
+        );
 
         final bindings = mappingMethodDispatcher
             .get(mappingBehavior)
             .analyze(bindingsContext);
 
-        if (method.name != null) {
+        if (name != null) {
           accumulator.add(
             DefinedMappingMethod(
-              name: method.name!,
+              name: name,
               isOverride: true,
               returnType: method.returnType,
               optionalReturn: method.returnType.isNullable,

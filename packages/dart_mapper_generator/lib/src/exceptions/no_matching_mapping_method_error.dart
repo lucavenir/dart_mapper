@@ -37,14 +37,16 @@ class NoMatchingMappingMethodError extends InvalidGenerationSourceError {
     required String? targetType,
     required Map<String, String> rejected,
     required Element element,
+    bool forCollectionElements = false,
   }) : super(
-          "No mapper method found for @Mapping(target: '$target') with "
+          "No mapper method found for "
+          "${forCollectionElements ? "elements of '$target'" : "@Mapping(target: '$target')"} with "
           "source (${arguments.join(', ')})"
           "${targetType == null ? '' : ' returning $targetType'}.\n"
           "${rejected.isEmpty ? 'No other mapper method is available.' : 'Rejected candidates:\n${rejected.entries.map((e) => '  - ${e.key}: ${e.value}').join('\n')}'}\n"
           "Fix: Add a mapper method (in the mapper or in a mapper listed in "
           "uses) taking these parameters in this order and returning a "
-          "value assignable to the target, or use callable.",
+          "value assignable to the target${forCollectionElements ? '.' : ', or use callable.'}",
           element: element,
         );
 }

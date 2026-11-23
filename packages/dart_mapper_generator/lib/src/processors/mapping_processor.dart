@@ -23,10 +23,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import 'package:analyzer/dart/element/type.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_mapper_generator/src/extensions/dart_type.dart';
+import 'package:dart_mapper_generator/src/extensions/expression.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/mapping_parameter.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/bases/bindable_mapping_method.dart';
+import 'package:dart_mapper_generator/src/models/mapper/mapping/method/collection_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/subclass_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapping_behavior.dart';
 import 'package:dart_mapper_generator/src/processors/component_processor.dart';
@@ -52,6 +55,10 @@ class MappingProcessor extends ComponentProcessor<Method> {
     }
 
     final method = context.currentMethod;
+    if (method is CollectionMappingMethod) {
+      return _processCollection(context, method);
+    }
+
     // Nullable parameters are optional, after the required ones. When a
     // nullable one precedes a required one, that would reorder the parameters
     // and break the override: all stay required, in their declared order.
@@ -85,6 +92,80 @@ class MappingProcessor extends ComponentProcessor<Method> {
               : methodCodeDispatcher.get(method.behavior).process(context);
       },
     );
+  }
+
+  Method _processCollection(
+    ProcessorMethodContext context,
+    CollectionMappingMethod method,
+  ) {
+    final source = method.source;
+    final sourceName = source.name!;
+    final target = method.targetType;
+    final returnType = context.resolveTypeDeep(target);
+    final constructorType = refer(
+      method.optionalReturn
+          ? returnType.substring(0, returnType.length - 1)
+          : returnType,
+    );
+    final parameter = Parameter((builder) {
+      builder
+        ..name = sourceName
+        ..type = refer(context.resolveTypeDeep(source.type))
+        ..named = source.isNamed
+        ..required = source.isRequiredNamed;
+      if (source.defaultValueCode case final code?) {
+        builder.defaultTo = Code(code);
+      }
+    });
+
+    final mapped = refer(sourceName).property('map').call(
+      [refer('this').property(method.elementMapper.name)],
+      {},
+      [refer(context.resolveTypeDeep(method.targetItemType))],
+    );
+    final result = switch (target) {
+      DartType(isDartCoreList: true) => mapped.propertyToList(),
+      DartType(isDartCoreSet: true) => mapped.propertyToSet(),
+      DartType(isBuiltList: true) ||
+      DartType(isBuiltSet: true) ||
+      DartType(isFicIList: true) ||
+      DartType(isFicISet: true) =>
+        constructorType.newInstance([mapped]),
+      DartType(isFicListSet: true) => constructorType.newInstanceNamed(
+          'of',
+          [mapped],
+        ),
+      _ => mapped,
+    };
+
+    return Method((builder) {
+      builder
+        ..annotations.add(refer('override'))
+        ..name = method.name
+        ..types.addAll(method.typeParameters.map(
+          (parameter) => TypeReference((type) {
+            type.symbol = parameter.name;
+            if (parameter.bound case final bound?) {
+              type.bound = refer(context.resolveTypeDeep(bound));
+            }
+          }),
+        ))
+        ..returns = refer(returnType)
+        ..body = Block.of([
+          if (source.type.isNullable)
+            method.optionalReturn
+                ? Code('if ($sourceName == null) return null;')
+                : Code(
+                    "if ($sourceName == null) throw ArgumentError.notNull('$sourceName');",
+                  ),
+          result.returned.statement,
+        ]);
+      if (source.isRequiredPositional) {
+        builder.requiredParameters.add(parameter);
+      } else {
+        builder.optionalParameters.add(parameter);
+      }
+    });
   }
 
   Iterable<Parameter> _processParameters(
