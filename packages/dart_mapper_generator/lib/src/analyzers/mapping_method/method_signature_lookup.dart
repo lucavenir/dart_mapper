@@ -110,6 +110,7 @@ class MethodSignatureLookup with AliasesMixin {
     DartType? targetType,
     String? qualifiedBy,
     bool hasDefaultValue = false,
+    bool forCollectionElements = false,
   }) {
     final element = context.method;
     final typeSystem = context.mapperClass.library.typeSystem;
@@ -119,6 +120,18 @@ class MethodSignatureLookup with AliasesMixin {
     final external = _candidates(context.mapperUsages, external: true);
     final internal = _candidates(context.internalMapperUsages, external: false);
     var candidates = [...external, ...internal];
+    if (forCollectionElements) {
+      candidates = candidates.where((candidate) {
+        final usage = candidate.usage;
+        final mapperType = usage.mapperType;
+        if (mapperType is! InterfaceType) return false;
+
+        final method = mapperType.getMethod(usage.functionName);
+        return method != null &&
+            !method.isStatic &&
+            method.isAccessibleIn(context.mapperClass.library);
+      }).toList();
+    }
 
     if (qualifiedBy != null) {
       final qualified = candidates
@@ -146,6 +159,7 @@ class MethodSignatureLookup with AliasesMixin {
         arguments,
         effectiveTarget,
         hasDefaultValue: hasDefaultValue,
+        forCollectionElements: forCollectionElements,
       );
       if (reason == null) {
         matches.add(candidate);
@@ -165,6 +179,7 @@ class MethodSignatureLookup with AliasesMixin {
         targetType: effectiveTarget == null ? null : _typeName(effectiveTarget),
         rejected: rejected,
         element: element,
+        forCollectionElements: forCollectionElements,
       );
     }
 
@@ -180,11 +195,13 @@ class MethodSignatureLookup with AliasesMixin {
     if (chosen.length > 1 && effectiveTarget != null) {
       final exact = chosen
           .where(
-            (match) => match.usage.returnType.same(
-              effectiveTarget,
-              aliases: importAliases,
-              useNullability: false,
-            ),
+            (match) => forCollectionElements
+                ? match.usage.returnType == effectiveTarget
+                : match.usage.returnType.same(
+                    effectiveTarget,
+                    aliases: importAliases,
+                    useNullability: false,
+                  ),
           )
           .toList(growable: false);
       if (exact.isNotEmpty) {
@@ -196,6 +213,7 @@ class MethodSignatureLookup with AliasesMixin {
         target: target,
         candidates: chosen.map(_signature).toList(growable: false),
         element: element,
+        forCollectionElements: forCollectionElements,
       );
     }
 
@@ -235,7 +253,13 @@ class MethodSignatureLookup with AliasesMixin {
     List<SourceArgument> arguments,
     DartType? target, {
     required bool hasDefaultValue,
+    required bool forCollectionElements,
   }) {
+    // A tear-off passed to Iterable.map must match its callback type
+    // without implicit downcasts from dynamic.
+    final accepts = forCollectionElements
+        ? typeSystem.isSubtypeOf
+        : typeSystem.isAssignableTo;
     final parameters = usage.parameters;
     if (parameters.any((parameter) => parameter.isNamed)) {
       return 'declares named parameter(s), which generated calls cannot pass';
@@ -258,12 +282,12 @@ class MethodSignatureLookup with AliasesMixin {
               context.mapperClass.library.typeProvider.nullType,
             )
           : argument.type;
-      if (typeSystem.isAssignableTo(type, parameterType)) {
+      if (accepts(type, parameterType)) {
         continue;
       }
 
       final description = '`${argument.description}`';
-      if (typeSystem.isAssignableTo(
+      if (accepts(
         typeSystem.promoteToNonNull(type),
         parameterType,
       )) {
@@ -280,7 +304,10 @@ class MethodSignatureLookup with AliasesMixin {
     final returnType = hasDefaultValue
         ? typeSystem.promoteToNonNull(usage.returnType)
         : usage.returnType;
-    if (target != null && !typeSystem.isAssignableTo(returnType, target)) {
+    if (forCollectionElements && returnType is VoidType) {
+      return 'returns void';
+    }
+    if (target != null && !accepts(returnType, target)) {
       return 'returns ${_typeName(usage.returnType)}, not assignable to '
           'the target ${_typeName(target)}';
     }

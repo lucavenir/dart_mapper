@@ -33,11 +33,12 @@ class AmbiguousMappingMethodError extends InvalidGenerationSourceError {
     required String target,
     required List<String> candidates,
     required Element element,
+    bool forCollectionElements = false,
   }) : super(
-          "Ambiguous mapper method for @Mapping(target: '$target'): multiple "
+          "Ambiguous mapper method for "
+          "${forCollectionElements ? "elements of '$target'" : "@Mapping(target: '$target')"}: multiple "
           "methods match (${candidates.join(', ')}).\n"
-          "Fix: Select the one to use with @Mapping(target: '$target', "
-          "qualifiedBy: 'methodName') or qualifiedBy: 'MapperClass.methodName'.",
+          "${forCollectionElements ? 'Fix: Make sure only one element mapping method matches.' : "Fix: Select the one to use with @Mapping(target: '$target', qualifiedBy: 'methodName') or qualifiedBy: 'MapperClass.methodName'."}",
           element: element,
         );
 }

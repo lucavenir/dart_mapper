@@ -26,6 +26,7 @@
 import 'package:dart_mapper_generator/src/models/mapper/constructor/mapper_constructor.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapper_instance_field.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/bases/mapping_method.dart';
+import 'package:dart_mapper_generator/src/models/mapper/mapping/method/collection_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/defined_mapping_method.dart';
 import 'package:dart_mapper_generator/src/models/mapper/mapping/method/subclass_mapping_method.dart';
 
@@ -47,6 +48,10 @@ class MapperClass {
         _mappingMethods.whereType<DefinedMappingMethod>();
 
     yield* internalMappingMethods;
+
+    final collectionMethods =
+        _mappingMethods.whereType<CollectionMappingMethod>();
+    yield* collectionMethods;
 
     for (final method in internalMappingMethods) {
       yield* method.bindings.expand((binding) => binding.mappingMethods);
